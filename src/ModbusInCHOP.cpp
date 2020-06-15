@@ -15,16 +15,17 @@
 //#include <inttypes.h>
 //#include <stdio.h>
 #include <modbus.h>
+#include <iostream>
 
-
-#ifdef _WIN32
-# include <winsock2.h>
-#else
-# include <sys/socket.h>
-#endif
+//#ifdef _WIN32
+//# include <winsock2.h>
+//#else
+//# include <sys/socket.h>
+//#endif
 
 #include "ModbusInCHOP.h"
 
+#include <stdio.h>
 #include <string.h>
 #include <cmath>
 #include <assert.h>
@@ -49,14 +50,14 @@ FillCHOPPluginInfo(CHOP_PluginInfo *info)
 	// The opType is the unique name for this CHOP. It must start with a 
 	// capital A-Z character, and all the following characters must lower case
 	// or numbers (a-z, 0-9)
-	info->customOPInfo.opType->setString("Customsignal");
+	info->customOPInfo.opType->setString("Modbus");
 
 	// The opLabel is the text that will show up in the OP Create Dialog
-	info->customOPInfo.opLabel->setString("Custom Signal");
+	info->customOPInfo.opLabel->setString("Modbus");
 
 	// Information about the author of this OP
-	info->customOPInfo.authorName->setString("Author Name");
-	info->customOPInfo.authorEmail->setString("email@email.com");
+	info->customOPInfo.authorName->setString("Matthew Wachter");
+	info->customOPInfo.authorEmail->setString("matthewwachter@gmail.com");
 
 	// This CHOP can work with 0 inputs
 	info->customOPInfo.minInputs = 0;
@@ -90,6 +91,7 @@ DestroyCHOPInstance(CHOP_CPlusPlusBase* instance)
 ModbusInCHOP::ModbusInCHOP(const OP_NodeInfo* info) : myNodeInfo(info)
 {
 	myExecuteCount = 0;
+	myConnectionState = false;
 	//myOffset = 0.0;
 }
 
@@ -124,12 +126,12 @@ ModbusInCHOP::getOutputInfo(CHOP_OutputInfo* info, const OP_Inputs* inputs, void
 	}
 	else
 	{
-		info->numChannels = 1;
+		info->numChannels = inputs->getParInt("Rbits");
 
 		// Since we are outputting a timeslice, the system will dictate
 		// the numSamples and startIndex of the CHOP data
-		//info->numSamples = 1;
-		//info->startIndex = 0
+		info->numSamples = 1;
+		info->startIndex = 0;
 
 		// For illustration we are going to output 120hz data
 		info->sampleRate = 120;
@@ -152,35 +154,55 @@ ModbusInCHOP::execute(CHOP_Output* output,
 	int connect = inputs->getParInt("Connect");
 
 
-	switch (myConnectionState)
+	if (!myConnectionState)
 	{
-		case 0:
-			if (connect)
-			{
-				const char *ip = inputs->getParString("Ip");
-				int port = inputs->getParInt("Port");
-				
-				ctx = modbus_new_tcp(ip, port);
-				if (modbus_connect(ctx) == -1) {
-					//fprintf(stderr, "Unable to connect %s\n", modbus_strerror(errno));
-					modbus_free(ctx);
-					//return -1;
-				}
-				else {
-					myConnectionState = 1;
-				}
-				
+		//std::cout << "false connection state\n";
+		if (connect)
+		{
+			const char *ip = inputs->getParString("Ip");
+			int port = inputs->getParInt("Port");
+
+			std::cout << ip << "\n";
+			std::cout << port << "\n";
+			//std::cout << modbus_new_tcp(ip, port);
+			ctx = modbus_new_tcp(ip, port);
+			if (ctx == NULL) {
+				std::cout << fprintf(stderr, "Unable to allocate libmodbus context\n");
 			}
-			break;
-		
-		case 1:
-			if (!connect)
-			{
-				modbus_close(ctx);
+			rc = modbus_connect(ctx);
+			if ( rc == -1) {
+				std::cout << fprintf(stderr, "Unable to connect %s\n", modbus_strerror(errno));
 				modbus_free(ctx);
-				myConnectionState = 0;
 			}
-			break;
+			else {
+				std::cout << "connection established\n";
+				myConnectionState = true;
+			}
+
+		}
+	}
+	else
+	{
+		//std::cout << "connected\n";
+		if (!connect)
+		{
+			std::cout << "disconnected\n";
+			modbus_close(ctx);
+			modbus_free(ctx);
+			myConnectionState = 0;
+		}
+		else
+		{
+			int raddr = inputs->getParInt("Raddr");
+			int rbits = inputs->getParInt("Rbits");
+			rc = modbus_read_registers(ctx, raddr, rbits, tab_reg);
+			if (rc == -1) {
+				std::cout << (stderr, "%s\n", modbus_strerror(errno));
+			}
+			std::cout << tab_reg;
+			std::cout << "\n";
+		}
+
 	}
 }
 
@@ -282,7 +304,7 @@ ModbusInCHOP::setupParameters(OP_ParameterManager* manager, void *reserved1)
 
 		np.name = "Port";
 		np.label = "Port";
-		np.defaultValues[0] = 6666;
+		np.defaultValues[0] = 501;
 		np.minSliders[0] = 0;
 		np.maxSliders[0] = 10000;
 		
@@ -301,6 +323,34 @@ ModbusInCHOP::setupParameters(OP_ParameterManager* manager, void *reserved1)
 		np.maxSliders[0] = 1;
 
 		OP_ParAppendResult res = manager->appendToggle(np);
+		assert(res == OP_ParAppendResult::Success);
+	}
+
+	// Registers Address
+	{
+		OP_NumericParameter  np;
+
+		np.name = "Raddr";
+		np.label = "Register Address";
+		np.defaultValues[0] = 0;
+		np.minSliders[0] = 0;
+		np.maxSliders[0] = 1023;
+
+		OP_ParAppendResult res = manager->appendInt(np);
+		assert(res == OP_ParAppendResult::Success);
+	}
+	
+	// Registers Num Bits
+	{
+		OP_NumericParameter  np;
+
+		np.name = "Rbits";
+		np.label = "Register Bits";
+		np.defaultValues[0] = 0;
+		np.minSliders[0] = 0;
+		np.maxSliders[0] = 1023;
+
+		OP_ParAppendResult res = manager->appendInt(np);
 		assert(res == OP_ParAppendResult::Success);
 	}
 }

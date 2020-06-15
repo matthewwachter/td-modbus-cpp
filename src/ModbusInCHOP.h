@@ -74,10 +74,11 @@ private:
 
 	//double				myOffset;
 
-	int				    myConnectionState;
+	bool				myConnectionState;
 
 	// Modbus
 	modbus_t*			ctx;
+	uint16_t			tab_reg[1024 * sizeof(uint16_t)];
 
 	int					rc;
 
