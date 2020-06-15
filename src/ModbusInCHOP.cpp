@@ -29,6 +29,7 @@
 #include <string.h>
 #include <cmath>
 #include <assert.h>
+#include <string>
 
 
 
@@ -142,7 +143,9 @@ ModbusInCHOP::getOutputInfo(CHOP_OutputInfo* info, const OP_Inputs* inputs, void
 void
 ModbusInCHOP::getChannelName(int32_t index, OP_String *name, const OP_Inputs* inputs, void* reserved1)
 {
-	name->setString("chan1");
+	//std::string name = "hi";
+	std::string result = "chan" + std::to_string(index);
+	name->setString(result.data());
 }
 
 void
@@ -201,6 +204,11 @@ ModbusInCHOP::execute(CHOP_Output* output,
 			}
 			std::cout << tab_reg;
 			std::cout << "\n";
+			
+			for (int i = 0; i < output->numChannels; i++)
+			{
+				output->channels[i][0] = float(tab_reg[i * sizeof(uint16_t)]);
+			}
 		}
 
 	}
