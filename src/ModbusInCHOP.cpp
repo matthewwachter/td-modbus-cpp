@@ -136,7 +136,7 @@ ModbusInCHOP::getOutputInfo(CHOP_OutputInfo* info, const OP_Inputs* inputs, void
 	info->startIndex = 0;
 
 	// For illustration we are going to output 120hz data
-	info->sampleRate = 10;
+	info->sampleRate = 60;
 	return true;
 	//}
 }
@@ -209,13 +209,13 @@ ModbusInCHOP::execute(CHOP_Output* output,
 		{
 			int raddr = inputs->getParInt("Raddr");
 			int rbits = inputs->getParInt("Rbits");
-			rc = modbus_read_bits(ctx, raddr, rbits, coils_tab_reg);
+			rc = modbus_read_registers(ctx, raddr, rbits, coils_tab_reg);
 			if (rc == -1) {
 				std::cout << "ERROR\n";
 				std::cout << (stderr, "%s\n", modbus_strerror(errno));
 			}
 
-			rc = modbus_read_input_bits(ctx, raddr, rbits, registers_tab_reg);
+			rc = modbus_read_input_registers(ctx, raddr, rbits, registers_tab_reg);
 			if (rc == -1) {
 				std::cout << "ERROR\n";
 				std::cout << (stderr, "%s\n", modbus_strerror(errno));
@@ -387,7 +387,10 @@ ModbusInCHOP::setupParameters(OP_ParameterManager* manager, void *reserved1)
 		np.label = "Register Address";
 		np.defaultValues[0] = 0;
 		np.minSliders[0] = 0;
-		np.maxSliders[0] = 1024;
+		np.maxSliders[0] = 1600;
+		np.clampMins[0] = 0;
+		np.clampMaxes[0] = 1600;
+		
 
 		OP_ParAppendResult res = manager->appendInt(np);
 		assert(res == OP_ParAppendResult::Success);
@@ -402,6 +405,8 @@ ModbusInCHOP::setupParameters(OP_ParameterManager* manager, void *reserved1)
 		np.defaultValues[0] = 100;
 		np.minSliders[0] = 1;
 		np.maxSliders[0] = 1600;
+		np.clampMins[0] = 1;
+		np.clampMaxes[0] = 1600;
 
 		OP_ParAppendResult res = manager->appendInt(np);
 		assert(res == OP_ParAppendResult::Success);

@@ -78,8 +78,8 @@ private:
 
 	// Modbus
 	modbus_t*			ctx;
-	uint8_t				coils_tab_reg[1600 * sizeof(uint8_t)];
-	uint8_t				registers_tab_reg[1600 * sizeof(uint8_t)];
+	uint16_t				coils_tab_reg[1600 * sizeof(uint16_t)];
+	uint16_t				registers_tab_reg[1600 * sizeof(uint16_t)];
 
 	int					rc;
 
