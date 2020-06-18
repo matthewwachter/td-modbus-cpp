@@ -111,7 +111,7 @@ ModbusInCHOP::getGeneralInfo(CHOP_GeneralInfo* ginfo, const OP_Inputs* inputs, v
 	// getOutputInfo() returns true, and likely also set the info->numSamples to how many
 	// samples you want to generate for this CHOP. Otherwise it'll take on length of the
 	// input CHOP, which may be timesliced.
-	ginfo->timeslice = true;
+	ginfo->timeslice = false;
 
 	ginfo->inputMatchIndex = 0;
 }
@@ -119,33 +119,44 @@ ModbusInCHOP::getGeneralInfo(CHOP_GeneralInfo* ginfo, const OP_Inputs* inputs, v
 bool
 ModbusInCHOP::getOutputInfo(CHOP_OutputInfo* info, const OP_Inputs* inputs, void* reserved1)
 {
-	// If there is an input connected, we are going to match it's channel names etc
-	// otherwise we'll specify our own.
-	if (inputs->getNumInputs() > 0)
-	{
-		return false;
-	}
-	else
-	{
-		info->numChannels = inputs->getParInt("Rbits");
+	//// If there is an input connected, we are going to match it's channel names etc
+	//// otherwise we'll specify our own.
+	//if (inputs->getNumInputs() > 0)
+	//{
+	//	return false;
+	//}
+	//else
+	//{
+	/*info->numChannels = inputs->getParInt("Rbits");*/
+	info->numChannels = 2;
 
-		// Since we are outputting a timeslice, the system will dictate
-		// the numSamples and startIndex of the CHOP data
-		info->numSamples = 1;
-		info->startIndex = 0;
+	// Since we are outputting a timeslice, the system will dictate
+	// the numSamples and startIndex of the CHOP data
+	info->numSamples = inputs->getParInt("Rbits");
+	info->startIndex = 0;
 
-		// For illustration we are going to output 120hz data
-		info->sampleRate = 120;
-		return true;
-	}
+	// For illustration we are going to output 120hz data
+	info->sampleRate = 10;
+	return true;
+	//}
 }
 
 void
 ModbusInCHOP::getChannelName(int32_t index, OP_String *name, const OP_Inputs* inputs, void* reserved1)
 {
-	//std::string name = "hi";
-	std::string result = "chan" + std::to_string(index);
-	name->setString(result.data());
+	//std::string result = "chan" + std::to_string(index);
+	//name->setString(result.data());
+	//std::cout << index;
+	switch (index)
+	{
+	case 0:
+		name->setString("coils");
+		break;
+	case 1:
+		name->setString("registers");
+		break;
+	}
+	
 }
 
 void
@@ -198,17 +209,27 @@ ModbusInCHOP::execute(CHOP_Output* output,
 		{
 			int raddr = inputs->getParInt("Raddr");
 			int rbits = inputs->getParInt("Rbits");
-			rc = modbus_read_registers(ctx, raddr, rbits, tab_reg);
+			rc = modbus_read_bits(ctx, raddr, rbits, coils_tab_reg);
 			if (rc == -1) {
+				std::cout << "ERROR\n";
 				std::cout << (stderr, "%s\n", modbus_strerror(errno));
 			}
-			std::cout << tab_reg;
-			std::cout << "\n";
-			
-			for (int i = 0; i < output->numChannels; i++)
-			{
-				output->channels[i][0] = float(tab_reg[i * sizeof(uint16_t)]);
+
+			rc = modbus_read_input_bits(ctx, raddr, rbits, registers_tab_reg);
+			if (rc == -1) {
+				std::cout << "ERROR\n";
+				std::cout << (stderr, "%s\n", modbus_strerror(errno));
 			}
+
+
+			for (int i = 0; i < rbits; i++)
+			{
+				//output->channels[0][i] = float(tab_reg[i * sizeof(uint16_t)]);
+				output->channels[0][i] = float(coils_tab_reg[i]);
+				output->channels[1][i] = float(registers_tab_reg[i]);
+				//std::cout << float(tab_reg[i]);				
+			}
+			//std::cout << "\n";
 		}
 
 	}
@@ -334,6 +355,30 @@ ModbusInCHOP::setupParameters(OP_ParameterManager* manager, void *reserved1)
 		assert(res == OP_ParAppendResult::Success);
 	}
 
+	//// register filter
+	//{
+	//	OP_StringParameter	sp;
+
+	//	sp.name = "Rfilter";
+	//	sp.label = "Register Filter";
+	//	sp.defaultValue = "[1-10] 12 14";
+
+	//	OP_ParAppendResult res = manager->appendString(sp);
+	//	assert(res == OP_ParAppendResult::Success);
+	//}
+
+	//// coil filter
+	//{
+	//	OP_StringParameter	sp;
+
+	//	sp.name = "Coils";
+	//	sp.label = "Coils";
+	//	sp.defaultValue = "127.0.0.1";
+
+	//	OP_ParAppendResult res = manager->appendString(sp);
+	//	assert(res == OP_ParAppendResult::Success);
+	//}
+
 	// Registers Address
 	{
 		OP_NumericParameter  np;
@@ -342,7 +387,7 @@ ModbusInCHOP::setupParameters(OP_ParameterManager* manager, void *reserved1)
 		np.label = "Register Address";
 		np.defaultValues[0] = 0;
 		np.minSliders[0] = 0;
-		np.maxSliders[0] = 1023;
+		np.maxSliders[0] = 1024;
 
 		OP_ParAppendResult res = manager->appendInt(np);
 		assert(res == OP_ParAppendResult::Success);
@@ -354,9 +399,9 @@ ModbusInCHOP::setupParameters(OP_ParameterManager* manager, void *reserved1)
 
 		np.name = "Rbits";
 		np.label = "Register Bits";
-		np.defaultValues[0] = 0;
-		np.minSliders[0] = 0;
-		np.maxSliders[0] = 1023;
+		np.defaultValues[0] = 100;
+		np.minSliders[0] = 1;
+		np.maxSliders[0] = 1600;
 
 		OP_ParAppendResult res = manager->appendInt(np);
 		assert(res == OP_ParAppendResult::Success);
