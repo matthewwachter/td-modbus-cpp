@@ -136,20 +136,20 @@ ModbusInCHOP::getOutputInfo(CHOP_OutputInfo* info, const OP_Inputs* inputs, void
 	//{
 	//	return false;
 	//}
-	//else
-	//{
-	/*info->numChannels = inputs->getParInt("Rwords");*/
-	info->numChannels = 2;
+//else
+//{
+/*info->numChannels = inputs->getParInt("Rwords");*/
+info->numChannels = 2;
 
-	// Since we are outputting a timeslice, the system will dictate
-	// the numSamples and startIndex of the CHOP data
-	info->numSamples = inputs->getParInt("Rwords")*16;
-	info->startIndex = inputs->getParInt("Raddr")*16;
+// Since we are outputting a timeslice, the system will dictate
+// the numSamples and startIndex of the CHOP data
+info->numSamples = inputs->getParInt("Rwords") * 16;
+info->startIndex = inputs->getParInt("Raddr") * 16;
 
-	// For illustration we are going to output 120hz data
-	info->sampleRate = 60;
-	return true;
-	//}
+// For illustration we are going to output 120hz data
+info->sampleRate = 60;
+return true;
+//}
 }
 
 void
@@ -167,13 +167,13 @@ ModbusInCHOP::getChannelName(int32_t index, OP_String *name, const OP_Inputs* in
 		name->setString("input_registers");
 		break;
 	}
-	
+
 }
 
 void
 ModbusInCHOP::execute(CHOP_Output* output,
-							  const OP_Inputs* inputs,
-							  void* reserved)
+	const OP_Inputs* inputs,
+	void* reserved)
 {
 	myExecuteCount++;
 	int active = inputs->getParInt("Active");
@@ -196,7 +196,7 @@ ModbusInCHOP::execute(CHOP_Output* output,
 				std::cout << fprintf(stderr, "Unable to allocate libmodbus context\n");
 			}
 			rc = modbus_connect(ctx);
-			if ( rc == -1) {
+			if (rc == -1) {
 				std::cout << fprintf(stderr, "Unable to connect %s\n", modbus_strerror(errno));
 				modbus_free(ctx);
 			}
@@ -221,7 +221,7 @@ ModbusInCHOP::execute(CHOP_Output* output,
 		{
 			int raddr = inputs->getParInt("Raddr");
 			int rwords = inputs->getParInt("Rwords");
-			
+
 			// write coils
 
 			switch (myExecuteCount % 6)
@@ -231,24 +231,31 @@ ModbusInCHOP::execute(CHOP_Output* output,
 				{
 					const OP_CHOPInput *cinput = inputs->getInputCHOP(0);
 
-					for (int i = 0; i < cinput->numSamples; i++)
-					{
-						write_coils[i] = bool(cinput->getChannelData(0)[i]);
+					const float *c_data = cinput->getChannelData(0);
+					uint16_t reggie;
+
+					for (int i = 0; i < rwords; i++) {
+						reggie = 0;
+						for (int j = 0; j < 16; j++) {
+							reggie += bool(c_data[i * 16 + 15-j])<<15-j;
+						}
+						
+						write_coils[i] = reggie;
 					}
 
-					if (write_coils != last_write_coils)
-					{
-						rc = modbus_write_bits(ctx, raddr, rwords * 16, write_coils);
-						if (rc == -1)
-						{
-							std::cout << "ERROR\n";
-							std::cout << (stderr, "%s\n", modbus_strerror(errno));
-						}
-						else
-						{
-							memcpy(last_write_coils, write_coils, sizeof(write_coils));
-						}
-					}
+					//if (write_coils != last_write_coils)
+					//{
+					rc = modbus_write_registers(ctx, raddr, rwords, write_coils);
+					//if (rc == -1)
+					//{
+					//	std::cout << "ERROR\n";
+					//	std::cout << (stderr, "%s\n", modbus_strerror(errno));
+					//}
+					//	else
+					//	{
+					//		memcpy(last_write_coils, write_coils, sizeof(write_coils));
+					//	}
+					//}
 				}
 
 			case 2: // read coils
