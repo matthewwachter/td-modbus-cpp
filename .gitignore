@@ -3,6 +3,8 @@
 
 !/**/*.dll
 !/**/*.lib
+!/**/*.exp
+!/**/*.pdb
 
 # User-specific files
 *.suo
@@ -52,7 +54,7 @@ artifacts/
 *_i.h
 *.ilk
 *.meta
-*.obj
+#*.obj
 *.pch
 #*.pdb
 *.pgc
