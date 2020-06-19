@@ -31,6 +31,9 @@
 #include <assert.h>
 #include <string>
 
+#define LAST(k,n) ((k) & ((1<<(n))-1))
+#define MID(k,m,n) LAST((k)>>(m),((n)-(m)))
+
 
 
 // These functions are basic C function, which the DLL loader can find
@@ -83,6 +86,14 @@ DestroyCHOPInstance(CHOP_CPlusPlusBase* instance)
 	// Delete the instance here, this will be called when
 	// Touch is shutting down, when the CHOP using that instance is deleted, or
 	// if the CHOP loads a different DLL
+	//std::cout << "connected\n";
+	//if (instance)
+	//{
+	//	std::cout << "disconnected\n";
+	//	modbus_close(ctx);
+	//	modbus_free(ctx);
+	//	myConnectionState = 0;
+	//}
 	delete (ModbusInCHOP*)instance;
 }
 
@@ -127,13 +138,13 @@ ModbusInCHOP::getOutputInfo(CHOP_OutputInfo* info, const OP_Inputs* inputs, void
 	//}
 	//else
 	//{
-	/*info->numChannels = inputs->getParInt("Rbits");*/
+	/*info->numChannels = inputs->getParInt("Rwords");*/
 	info->numChannels = 2;
 
 	// Since we are outputting a timeslice, the system will dictate
 	// the numSamples and startIndex of the CHOP data
-	info->numSamples = inputs->getParInt("Rbits");
-	info->startIndex = 0;
+	info->numSamples = inputs->getParInt("Rwords")*16;
+	info->startIndex = inputs->getParInt("Raddr")*16;
 
 	// For illustration we are going to output 120hz data
 	info->sampleRate = 60;
@@ -153,7 +164,7 @@ ModbusInCHOP::getChannelName(int32_t index, OP_String *name, const OP_Inputs* in
 		name->setString("coils");
 		break;
 	case 1:
-		name->setString("registers");
+		name->setString("input_registers");
 		break;
 	}
 	
@@ -165,13 +176,14 @@ ModbusInCHOP::execute(CHOP_Output* output,
 							  void* reserved)
 {
 	myExecuteCount++;
-	int connect = inputs->getParInt("Connect");
+	int active = inputs->getParInt("Active");
 
+	//std::cout << myExecuteCount % 3;
 
 	if (!myConnectionState)
 	{
 		//std::cout << "false connection state\n";
-		if (connect)
+		if (active)
 		{
 			const char *ip = inputs->getParString("Ip");
 			int port = inputs->getParInt("Port");
@@ -198,7 +210,7 @@ ModbusInCHOP::execute(CHOP_Output* output,
 	else
 	{
 		//std::cout << "connected\n";
-		if (!connect)
+		if (!active)
 		{
 			std::cout << "disconnected\n";
 			modbus_close(ctx);
@@ -208,30 +220,68 @@ ModbusInCHOP::execute(CHOP_Output* output,
 		else
 		{
 			int raddr = inputs->getParInt("Raddr");
-			int rbits = inputs->getParInt("Rbits");
-			rc = modbus_read_registers(ctx, raddr, rbits, coils_tab_reg);
-			if (rc == -1) {
-				std::cout << "ERROR\n";
-				std::cout << (stderr, "%s\n", modbus_strerror(errno));
-			}
+			int rwords = inputs->getParInt("Rwords");
+			
+			// write coils
 
-			rc = modbus_read_input_registers(ctx, raddr, rbits, registers_tab_reg);
-			if (rc == -1) {
-				std::cout << "ERROR\n";
-				std::cout << (stderr, "%s\n", modbus_strerror(errno));
-			}
-
-
-			for (int i = 0; i < rbits; i++)
+			switch (myExecuteCount % 6)
 			{
-				//output->channels[0][i] = float(tab_reg[i * sizeof(uint16_t)]);
-				output->channels[0][i] = float(coils_tab_reg[i]);
-				output->channels[1][i] = float(registers_tab_reg[i]);
-				//std::cout << float(tab_reg[i]);				
-			}
-			//std::cout << "\n";
-		}
+			case 0: //write coils
+				if (inputs->getNumInputs() > 0)
+				{
+					const OP_CHOPInput *cinput = inputs->getInputCHOP(0);
 
+					for (int i = 0; i < cinput->numSamples; i++)
+					{
+						write_coils[i] = bool(cinput->getChannelData(0)[i]);
+					}
+
+					if (write_coils != last_write_coils)
+					{
+						rc = modbus_write_bits(ctx, raddr, rwords * 16, write_coils);
+						if (rc == -1)
+						{
+							std::cout << "ERROR\n";
+							std::cout << (stderr, "%s\n", modbus_strerror(errno));
+						}
+						else
+						{
+							memcpy(last_write_coils, write_coils, sizeof(write_coils));
+						}
+					}
+				}
+
+			case 2: // read coils
+				rc = modbus_read_registers(ctx, raddr, rwords, coils_tab_reg);
+				if (rc == -1) {
+					std::cout << "ERROR\n";
+					std::cout << (stderr, "%s\n", modbus_strerror(errno));
+				}
+				for (int i = 0; i < rwords; i++)
+				{
+					for (int j = 0; j < 16; j++)
+					{
+						output->channels[0][i * 16 + j] = float((bool)(coils_tab_reg[i] & (1U << j)));
+					}
+				}
+			
+			case 4: // read input registers
+				rc = modbus_read_input_registers(ctx, raddr, rwords, registers_tab_reg);
+				if (rc == -1) {
+					std::cout << "ERROR\n";
+					std::cout << (stderr, "%s\n", modbus_strerror(errno));
+				}
+
+				// update chan values
+				for (int i = 0; i < rwords; i++)
+				{
+					for (int j = 0; j < 16; j++)
+					{
+						output->channels[1][i * 16 + j] = float((bool)(registers_tab_reg[i] & (1U << j)));
+					}
+				}
+			}
+		}
 	}
 }
 
@@ -345,8 +395,8 @@ ModbusInCHOP::setupParameters(OP_ParameterManager* manager, void *reserved1)
 	{
 		OP_NumericParameter  np;
 
-		np.name = "Connect";
-		np.label = "Connect";
+		np.name = "Active";
+		np.label = "Active";
 		np.defaultValues[0] = 0;
 		np.minSliders[0] = 0;
 		np.maxSliders[0] = 1;
@@ -354,6 +404,21 @@ ModbusInCHOP::setupParameters(OP_ParameterManager* manager, void *reserved1)
 		OP_ParAppendResult res = manager->appendToggle(np);
 		assert(res == OP_ParAppendResult::Success);
 	}
+
+	// connect
+	{
+		OP_NumericParameter  np;
+
+		np.name = "Staggerreq";
+		np.label = "Stagger Requests";
+		np.defaultValues[0] = 0;
+		np.minSliders[0] = 0;
+		np.maxSliders[0] = 1;
+
+		OP_ParAppendResult res = manager->appendToggle(np);
+		assert(res == OP_ParAppendResult::Success);
+	}
+
 
 	//// register filter
 	//{
@@ -387,10 +452,11 @@ ModbusInCHOP::setupParameters(OP_ParameterManager* manager, void *reserved1)
 		np.label = "Register Address";
 		np.defaultValues[0] = 0;
 		np.minSliders[0] = 0;
-		np.maxSliders[0] = 1600;
-		np.clampMins[0] = 0;
-		np.clampMaxes[0] = 1600;
-		
+		np.maxSliders[0] = 100;
+		np.minValues[0] = 0;
+		np.maxValues[0] = 100;
+		np.clampMins[0] = true;
+		np.clampMaxes[0] = true;
 
 		OP_ParAppendResult res = manager->appendInt(np);
 		assert(res == OP_ParAppendResult::Success);
@@ -400,13 +466,15 @@ ModbusInCHOP::setupParameters(OP_ParameterManager* manager, void *reserved1)
 	{
 		OP_NumericParameter  np;
 
-		np.name = "Rbits";
-		np.label = "Register Bits";
+		np.name = "Rwords";
+		np.label = "Register Words";
 		np.defaultValues[0] = 100;
 		np.minSliders[0] = 1;
-		np.maxSliders[0] = 1600;
-		np.clampMins[0] = 1;
-		np.clampMaxes[0] = 1600;
+		np.maxSliders[0] = 100;
+		np.minValues[0] = 1;
+		np.maxValues[0] = 100;
+		np.clampMins[0] = true;
+		np.clampMaxes[0] = true;
 
 		OP_ParAppendResult res = manager->appendInt(np);
 		assert(res == OP_ParAppendResult::Success);
