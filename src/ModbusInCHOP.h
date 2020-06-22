@@ -13,7 +13,7 @@
 */
 
 #include "CHOP_CPlusPlusBase.h"
-#include <thread>
+
 
 /*
 
@@ -61,10 +61,12 @@ public:
 	virtual void		setupParameters(OP_ParameterManager* manager, void *reserved1) override;
 	virtual void		pulsePressed(const char* name, void* reserved1) override;
 
+	
+
 private:
 	void connect(const char *ip, int port);
 	void disconnect();
-	void listen(int n);
+	void listen();
 	void startListening();
 
 	void copyWriteBuffer(const OP_Inputs*);
@@ -102,5 +104,5 @@ private:
 	int					rc;
 	bool				listenError;
 	bool				stopListening;
-	std::thread			listenThread;
+	//std::thread			listenThread;
 };

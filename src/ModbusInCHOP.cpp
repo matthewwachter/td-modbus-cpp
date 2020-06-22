@@ -155,7 +155,7 @@ ModbusInCHOP::disconnect()
 }
 
 void
-ModbusInCHOP::listen(int n)
+ModbusInCHOP::listen()
 {
 	isListening = true;
 	listenError = false;
@@ -192,7 +192,7 @@ ModbusInCHOP::listen(int n)
 void
 ModbusInCHOP::startListening()
 {
-	std::thread listenThread(listen, 1);
+	std::thread listenThread(&ModbusInCHOP::listen, this);
 }
 
 void
