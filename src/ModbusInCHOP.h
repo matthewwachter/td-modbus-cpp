@@ -13,6 +13,7 @@
 */
 
 #include "CHOP_CPlusPlusBase.h"
+#include <thread>
 
 /*
 
@@ -61,6 +62,15 @@ public:
 	virtual void		pulsePressed(const char* name, void* reserved1) override;
 
 private:
+	void connect(const char *ip, int port, int raddr, int rwords);
+	void disconnect();
+	void listen(int raddr, int rwords);
+	void startListening(int raddr, int rwords);
+
+	void copyWriteBuffer(int rwords, const OP_Inputs*);
+	void copyReadBuffers(int rwords, CHOP_Output*);
+
+
 
 	// We don't need to store this pointer, but we do for the example.
 	// The OP_NodeInfo class store information about the node that's using
@@ -74,18 +84,19 @@ private:
 
 	//double				myOffset;
 
-	bool				myConnectionState;
+	bool				isConnected;
+	bool				isListening;
 
 	// Modbus
 	modbus_t*			ctx;
 	
-	uint16_t				write_coils[100 * sizeof(uint16_t)];
-	uint16_t				last_write_coils[100 * sizeof(uint16_t)];
+	uint16_t			write_coils[100 * sizeof(uint16_t)];
+	uint16_t			last_write_coils[100 * sizeof(uint16_t)];
 
 	uint16_t			coils_tab_reg[100 * sizeof(uint16_t)];
 	uint16_t			registers_tab_reg[100 * sizeof(uint16_t)];
 
 	int					rc;
-
-
+	bool				listenError;
+	bool				stopListening;
 };

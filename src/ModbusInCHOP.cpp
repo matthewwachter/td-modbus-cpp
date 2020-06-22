@@ -103,13 +103,139 @@ DestroyCHOPInstance(CHOP_CPlusPlusBase* instance)
 ModbusInCHOP::ModbusInCHOP(const OP_NodeInfo* info) : myNodeInfo(info)
 {
 	myExecuteCount = 0;
-	myConnectionState = false;
+	isConnected = false;
 	//myOffset = 0.0;
 }
 
 ModbusInCHOP::~ModbusInCHOP()
 {
 
+}
+
+void
+ModbusInCHOP::connect(const char *ip, int port,int raddr, int rwords)
+{
+	//std::cout << ip << "\n";
+	//std::cout << port << "\n";
+	//std::cout << modbus_new_tcp(ip, port);
+	ctx = modbus_new_tcp(ip, port);
+	if (ctx == NULL) {
+		std::cout << fprintf(stderr, "Unable to allocate libmodbus context\n");
+	}
+	rc = modbus_connect(ctx);
+	if (rc == -1) {
+		std::cout << fprintf(stderr, "Unable to connect %s\n", modbus_strerror(errno));
+		modbus_free(ctx);
+	}
+	else {
+		std::cout << "connection established\n";
+		isConnected = true;
+		stopListening = false;
+		//start listening here
+
+		startListening(raddr, rwords);
+	}
+}
+
+void
+ModbusInCHOP::disconnect()
+{
+	// signal thread to stop listening
+	if (isListening) {
+		stopListening = true;
+	}
+	else
+	{
+		/*std::cout << "disconnected\n";*/
+		modbus_close(ctx);
+		modbus_free(ctx);
+		isConnected = false;
+	}
+}
+
+void
+ModbusInCHOP::startListening(int raddr, int rwords)
+{
+	std::thread listen(raddr, rwords);
+}
+
+void
+ModbusInCHOP::listen(int raddr, int rwords)
+{
+	isListening = true;
+	listenError = false;
+	while (!listenError && !stopListening)
+	{
+		// write registers (coils)
+		rc = modbus_write_registers(ctx, raddr, rwords, write_coils);
+		if (rc == -1)
+		{
+			listenError = true;
+			std::cout << "ERROR\n";
+			std::cout << (stderr, "%s\n", modbus_strerror(errno));
+		}
+
+		// read registers
+		rc = modbus_read_registers(ctx, raddr, rwords, coils_tab_reg);
+		if (rc == -1) {
+			listenError = true;
+			std::cout << "ERROR\n";
+			std::cout << (stderr, "%s\n", modbus_strerror(errno));
+		}
+
+		// read input registers
+		rc = modbus_read_input_registers(ctx, raddr, rwords, registers_tab_reg);
+		if (rc == -1) {
+			listenError = true;
+			std::cout << "ERROR\n";
+			std::cout << (stderr, "%s\n", modbus_strerror(errno));
+		}
+	}
+	isListening = false;
+}
+
+void
+ModbusInCHOP::copyWriteBuffer(int rwords, const OP_Inputs* inputs)
+{
+	// update write registers buffer
+	if (inputs->getNumInputs() > 0)
+	{
+		const OP_CHOPInput *cinput = inputs->getInputCHOP(0);
+
+		const float *c_data = cinput->getChannelData(0);
+		uint16_t tmp_reg;
+
+		// for each word
+		for (int i = 0; i < rwords; i++) {
+			tmp_reg = 0;
+
+			// for each bit
+			for (int j = 0; j < 16; j++) {
+				// bit shift to correct position
+				tmp_reg += bool(c_data[i * 16 + 15 - j]) << 15 - j;
+			}
+
+			write_coils[i] = tmp_reg;
+		}
+	}
+}
+
+void
+ModbusInCHOP::copyReadBuffers(int rwords, CHOP_Output* output)
+{
+	// for each word
+	for (int i = 0; i < rwords; i++)
+	{
+		// for each bit
+		for (int j = 0; j < 16; j++)
+		{
+			// update registers chan sample
+			output->channels[0][i * 16 + j] = float((bool)(coils_tab_reg[i] & (1U << j)));
+
+			// update input registers chan sample
+			output->channels[1][i * 16 + j] = float((bool)(registers_tab_reg[i] & (1U << j)));
+		}
+	}
 }
 
 void
@@ -180,113 +306,40 @@ ModbusInCHOP::execute(CHOP_Output* output,
 
 	//std::cout << myExecuteCount % 3;
 
-	if (!myConnectionState)
+	// if we are not connected
+	if (!isConnected)
 	{
-		//std::cout << "false connection state\n";
+		// if we should connect
 		if (active)
 		{
 			const char *ip = inputs->getParString("Ip");
 			int port = inputs->getParInt("Port");
-
-			std::cout << ip << "\n";
-			std::cout << port << "\n";
-			//std::cout << modbus_new_tcp(ip, port);
-			ctx = modbus_new_tcp(ip, port);
-			if (ctx == NULL) {
-				std::cout << fprintf(stderr, "Unable to allocate libmodbus context\n");
-			}
-			rc = modbus_connect(ctx);
-			if (rc == -1) {
-				std::cout << fprintf(stderr, "Unable to connect %s\n", modbus_strerror(errno));
-				modbus_free(ctx);
-			}
-			else {
-				std::cout << "connection established\n";
-				myConnectionState = true;
-			}
-
+			int raddr = inputs->getParInt("Raddr");
+			int rwords = inputs->getParInt("Rwords");
+			connect(ip, port, raddr, rwords);
 		}
 	}
+	// if we are connected
 	else
 	{
-		//std::cout << "connected\n";
+		// if we should not be connected, disconnect
 		if (!active)
 		{
-			std::cout << "disconnected\n";
-			modbus_close(ctx);
-			modbus_free(ctx);
-			myConnectionState = 0;
+			disconnect();
 		}
+		// if we are connected and should be
 		else
 		{
 			int raddr = inputs->getParInt("Raddr");
 			int rwords = inputs->getParInt("Rwords");
 
-			// write coils
+			copyWriteBuffer(rwords, inputs);
+			copyReadBuffers(rwords, output);
 
-			switch (myExecuteCount % 6)
-			{
-			case 0: //write coils
-				if (inputs->getNumInputs() > 0)
-				{
-					const OP_CHOPInput *cinput = inputs->getInputCHOP(0);
-
-					const float *c_data = cinput->getChannelData(0);
-					uint16_t reggie;
-
-					for (int i = 0; i < rwords; i++) {
-						reggie = 0;
-						for (int j = 0; j < 16; j++) {
-							reggie += bool(c_data[i * 16 + 15-j])<<15-j;
-						}
-						
-						write_coils[i] = reggie;
-					}
-
-					//if (write_coils != last_write_coils)
-					//{
-					rc = modbus_write_registers(ctx, raddr, rwords, write_coils);
-					//if (rc == -1)
-					//{
-					//	std::cout << "ERROR\n";
-					//	std::cout << (stderr, "%s\n", modbus_strerror(errno));
-					//}
-					//	else
-					//	{
-					//		memcpy(last_write_coils, write_coils, sizeof(write_coils));
-					//	}
-					//}
-				}
-
-			case 2: // read coils
-				rc = modbus_read_registers(ctx, raddr, rwords, coils_tab_reg);
-				if (rc == -1) {
-					std::cout << "ERROR\n";
-					std::cout << (stderr, "%s\n", modbus_strerror(errno));
-				}
-				for (int i = 0; i < rwords; i++)
-				{
-					for (int j = 0; j < 16; j++)
-					{
-						output->channels[0][i * 16 + j] = float((bool)(coils_tab_reg[i] & (1U << j)));
-					}
-				}
-			
-			case 4: // read input registers
-				rc = modbus_read_input_registers(ctx, raddr, rwords, registers_tab_reg);
-				if (rc == -1) {
-					std::cout << "ERROR\n";
-					std::cout << (stderr, "%s\n", modbus_strerror(errno));
-				}
-
-				// update chan values
-				for (int i = 0; i < rwords; i++)
-				{
-					for (int j = 0; j < 16; j++)
-					{
-						output->channels[1][i * 16 + j] = float((bool)(registers_tab_reg[i] & (1U << j)));
-					}
-				}
+			// if we are not listening, start the thread
+			if (!isListening) {
+				// start thread
+				startListening(raddr, rwords);
 			}
 		}
 	}
