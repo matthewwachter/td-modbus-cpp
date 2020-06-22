@@ -16,6 +16,7 @@
 //#include <stdio.h>
 #include <modbus.h>
 #include <iostream>
+#include <thread>
 
 //#ifdef _WIN32
 //# include <winsock2.h>
@@ -113,7 +114,7 @@ ModbusInCHOP::~ModbusInCHOP()
 }
 
 void
-ModbusInCHOP::connect(const char *ip, int port,int raddr, int rwords)
+ModbusInCHOP::connect(const char *ip, int port)
 {
 	//std::cout << ip << "\n";
 	//std::cout << port << "\n";
@@ -133,7 +134,7 @@ ModbusInCHOP::connect(const char *ip, int port,int raddr, int rwords)
 		stopListening = false;
 		//start listening here
 
-		startListening(raddr, rwords);
+		startListening();
 	}
 }
 
@@ -154,13 +155,7 @@ ModbusInCHOP::disconnect()
 }
 
 void
-ModbusInCHOP::startListening(int raddr, int rwords)
-{
-	std::thread listen(raddr, rwords);
-}
-
-void
-ModbusInCHOP::listen(int raddr, int rwords)
+ModbusInCHOP::listen(int n)
 {
 	isListening = true;
 	listenError = false;
@@ -195,7 +190,13 @@ ModbusInCHOP::listen(int raddr, int rwords)
 }
 
 void
-ModbusInCHOP::copyWriteBuffer(int rwords, const OP_Inputs* inputs)
+ModbusInCHOP::startListening()
+{
+	std::thread listenThread(listen, 1);
+}
+
+void
+ModbusInCHOP::copyWriteBuffer(const OP_Inputs* inputs)
 {
 	// update write registers buffer
 	if (inputs->getNumInputs() > 0)
@@ -221,7 +222,7 @@ ModbusInCHOP::copyWriteBuffer(int rwords, const OP_Inputs* inputs)
 }
 
 void
-ModbusInCHOP::copyReadBuffers(int rwords, CHOP_Output* output)
+ModbusInCHOP::copyReadBuffers(CHOP_Output* output)
 {
 	// for each word
 	for (int i = 0; i < rwords; i++)
@@ -314,9 +315,9 @@ ModbusInCHOP::execute(CHOP_Output* output,
 		{
 			const char *ip = inputs->getParString("Ip");
 			int port = inputs->getParInt("Port");
-			int raddr = inputs->getParInt("Raddr");
-			int rwords = inputs->getParInt("Rwords");
-			connect(ip, port, raddr, rwords);
+			raddr = inputs->getParInt("Raddr");
+			rwords = inputs->getParInt("Rwords");
+			connect(ip, port);
 		}
 	}
 	// if we are connected
@@ -330,16 +331,16 @@ ModbusInCHOP::execute(CHOP_Output* output,
 		// if we are connected and should be
 		else
 		{
-			int raddr = inputs->getParInt("Raddr");
-			int rwords = inputs->getParInt("Rwords");
+			raddr = inputs->getParInt("Raddr");
+			rwords = inputs->getParInt("Rwords");
 
-			copyWriteBuffer(rwords, inputs);
-			copyReadBuffers(rwords, output);
+			copyWriteBuffer(inputs);
+			copyReadBuffers(output);
 
 			// if we are not listening, start the thread
 			if (!isListening) {
 				// start thread
-				startListening(raddr, rwords);
+				startListening();
 			}
 		}
 	}

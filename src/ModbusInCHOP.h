@@ -62,13 +62,13 @@ public:
 	virtual void		pulsePressed(const char* name, void* reserved1) override;
 
 private:
-	void connect(const char *ip, int port, int raddr, int rwords);
+	void connect(const char *ip, int port);
 	void disconnect();
-	void listen(int raddr, int rwords);
-	void startListening(int raddr, int rwords);
+	void listen(int n);
+	void startListening();
 
-	void copyWriteBuffer(int rwords, const OP_Inputs*);
-	void copyReadBuffers(int rwords, CHOP_Output*);
+	void copyWriteBuffer(const OP_Inputs*);
+	void copyReadBuffers(CHOP_Output*);
 
 
 
@@ -88,6 +88,9 @@ private:
 	bool				isListening;
 
 	// Modbus
+	int					raddr;
+	int					rwords;
+	
 	modbus_t*			ctx;
 	
 	uint16_t			write_coils[100 * sizeof(uint16_t)];
@@ -99,4 +102,5 @@ private:
 	int					rc;
 	bool				listenError;
 	bool				stopListening;
+	std::thread			listenThread;
 };
