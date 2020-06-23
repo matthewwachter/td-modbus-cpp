@@ -101,6 +101,7 @@ ModbusInCHOP::~ModbusInCHOP()
 void
 ModbusInCHOP::connect(const char *ip, int port)
 {
+	int rc;
 	std::cout << ip << "\n";
 	std::cout << port << "\n";
 	//std::cout << modbus_new_tcp(ip, port);
@@ -142,6 +143,7 @@ ModbusInCHOP::disconnect()
 void
 ModbusInCHOP::comWrite(int raddr, int rwords)
 {
+	int rc;
 	// write registers (coils)
 	rc = modbus_write_registers(ctx, raddr, rwords, write_coils);
 	if (rc == -1)
@@ -155,6 +157,7 @@ ModbusInCHOP::comWrite(int raddr, int rwords)
 void
 ModbusInCHOP::comRead(int raddr, int rwords)
 {
+	int rc;
 	// read registers
 	rc = modbus_read_registers(ctx, raddr, rwords, coils_tab_reg);
 	if (rc == -1) {
@@ -212,30 +215,45 @@ void ModbusInCHOP::listen()
 	myThread = new std::thread(
 		[this]()
 		{
-			isListening = true;
-			listenError = false;
-			while (!listenError && !stopListening)
+			this->isListening = true;
+			this->listenError = false;
+			int rc;
+			std::cout << "starting thread\n";
+			std::cout << "listenError" << this->listenError << "\n";
+			std::cout << "stopListening" << this->stopListening << "\n";
+			while (!this->listenError && !this->stopListening)
 			{
+
+				std::cout << this->ctx << "\n";
+				std::cout << this->raddr << "\n";
+				std::cout << this->rwords << "\n";
+				std::cout << this->write_coils << "\n";
+
 				// write registers (coils)
-				rc = modbus_write_registers(ctx, raddr, rwords, write_coils);
+				rc = modbus_write_registers(this->ctx, this->raddr, this->rwords, this->write_coils);
 				if (rc == -1)
 				{
-					listenError = true;
+					this->listenError = true;
+					std::cout << "ERROR" << (stderr, "%s\n", modbus_strerror(errno)) << "\n";
 				}
 		
 				// read registers
-				rc = modbus_read_registers(ctx, raddr, rwords, coils_tab_reg);
+				rc = modbus_read_registers(this->ctx, this->raddr, this->rwords, this->coils_tab_reg);
 				if (rc == -1) {
-					listenError = true;
+					this->listenError = true;
+					std::cout << "ERROR" << (stderr, "%s\n", modbus_strerror(errno)) << "\n";
 				}
 		
 				// read input registers
-				rc = modbus_read_input_registers(ctx, raddr, rwords, registers_tab_reg);
+				rc = modbus_read_input_registers(this->ctx, this->raddr, this->rwords, this->registers_tab_reg);
 				if (rc == -1) {
-					listenError = true;
+					this->listenError = true;
+					std::cout << "ERROR" << (stderr, "%s\n", modbus_strerror(errno)) << "\n";
 				}
+				std::cout << "listening\n";
 			}
-			isListening = false;
+			this->isListening = false;
+			std::cout << "stopping thread\n";
 		}
 	);
 }
@@ -367,8 +385,8 @@ ModbusInCHOP::execute(CHOP_Output* output,
 		// if we are connected and should be
 		else
 		{
-			int raddr = inputs->getParInt("Raddr");
-			int rwords = inputs->getParInt("Rwords");
+			raddr = inputs->getParInt("Raddr");
+			rwords = inputs->getParInt("Rwords");
 
 			//if (bool(inputs->getParInt("Staggerreq")))
 			//{

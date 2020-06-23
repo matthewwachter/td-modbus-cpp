@@ -92,6 +92,6 @@ private:
 
 	// Modbus
 	
-	int			rc;
+	//int			rc;
 
 };
