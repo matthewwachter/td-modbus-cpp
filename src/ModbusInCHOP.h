@@ -61,13 +61,33 @@ public:
 	virtual void		setupParameters(OP_ParameterManager* manager, void *reserved1) override;
 	virtual void		pulsePressed(const char* name, void* reserved1) override;
 
+	int				raddr;
+	int				rwords;
+
+	modbus_t*			ctx;
+
+	bool				isActive;
+	bool				isConnected;
+
+	bool				isListening;
+	bool				listenError;
+	bool				stopListening;
 	
+	//std::thread			listenThread;
+
+	uint16_t			write_coils[100 * sizeof(uint16_t)];
+	uint16_t			last_write_coils[100 * sizeof(uint16_t)];
+
+	uint16_t			coils_tab_reg[100 * sizeof(uint16_t)];
+	uint16_t			registers_tab_reg[100 * sizeof(uint16_t)];
 
 private:
-	void connect(const char *ip, int port);
+	void connect(const char* ip, uint8_t port);
 	void disconnect();
 	void listen();
 	void startListening();
+
+	void doCom();
 
 	void copyWriteBuffer(const OP_Inputs*);
 	void copyReadBuffers(CHOP_Output*);
@@ -83,26 +103,8 @@ private:
 	// function is called, then passes back to the CHOP 
 	int32_t				myExecuteCount;
 
-
-	//double				myOffset;
-
-	bool				isConnected;
-	bool				isListening;
-
 	// Modbus
-	int					raddr;
-	int					rwords;
 	
-	modbus_t*			ctx;
-	
-	uint16_t			write_coils[100 * sizeof(uint16_t)];
-	uint16_t			last_write_coils[100 * sizeof(uint16_t)];
+	int			rc;
 
-	uint16_t			coils_tab_reg[100 * sizeof(uint16_t)];
-	uint16_t			registers_tab_reg[100 * sizeof(uint16_t)];
-
-	int					rc;
-	bool				listenError;
-	bool				stopListening;
-	//std::thread			listenThread;
 };

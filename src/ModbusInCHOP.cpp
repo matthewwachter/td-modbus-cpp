@@ -16,7 +16,7 @@
 //#include <stdio.h>
 #include <modbus.h>
 #include <iostream>
-#include <thread>
+//#include <thread>
 
 //#ifdef _WIN32
 //# include <winsock2.h>
@@ -32,8 +32,8 @@
 #include <assert.h>
 #include <string>
 
-#define LAST(k,n) ((k) & ((1<<(n))-1))
-#define MID(k,m,n) LAST((k)>>(m),((n)-(m)))
+//#define LAST(k,n) ((k) & ((1<<(n))-1))
+//#define MID(k,m,n) LAST((k)>>(m),((n)-(m)))
 
 
 
@@ -105,6 +105,7 @@ ModbusInCHOP::ModbusInCHOP(const OP_NodeInfo* info) : myNodeInfo(info)
 {
 	myExecuteCount = 0;
 	isConnected = false;
+	isListening = false;
 	//myOffset = 0.0;
 }
 
@@ -114,7 +115,7 @@ ModbusInCHOP::~ModbusInCHOP()
 }
 
 void
-ModbusInCHOP::connect(const char *ip, int port)
+ModbusInCHOP::connect(const char *ip, uint8_t port)
 {
 	//std::cout << ip << "\n";
 	//std::cout << port << "\n";
@@ -134,7 +135,7 @@ ModbusInCHOP::connect(const char *ip, int port)
 		stopListening = false;
 		//start listening here
 
-		startListening();
+		//startListening();
 	}
 }
 
@@ -155,36 +156,65 @@ ModbusInCHOP::disconnect()
 }
 
 void
+ModbusInCHOP::doCom()
+{
+	// write registers (coils)
+	rc = modbus_write_registers(ctx, raddr, rwords, write_coils);
+	if (rc == -1)
+	{
+		listenError = true;
+		std::cout << "ERROR\n";
+		std::cout << (stderr, "%s\n", modbus_strerror(errno));
+	}
+
+	// read registers
+	rc = modbus_read_registers(ctx, raddr, rwords, coils_tab_reg);
+	if (rc == -1) {
+		listenError = true;
+		std::cout << "ERROR\n";
+		std::cout << (stderr, "%s\n", modbus_strerror(errno));
+	}
+
+	// read input registers
+	rc = modbus_read_input_registers(ctx, raddr, rwords, registers_tab_reg);
+	if (rc == -1) {
+		listenError = true;
+		std::cout << "ERROR\n";
+		std::cout << (stderr, "%s\n", modbus_strerror(errno));
+	}
+}
+
+void
 ModbusInCHOP::listen()
 {
 	isListening = true;
 	listenError = false;
 	while (!listenError && !stopListening)
 	{
-		// write registers (coils)
-		rc = modbus_write_registers(ctx, raddr, rwords, write_coils);
-		if (rc == -1)
-		{
-			listenError = true;
-			std::cout << "ERROR\n";
-			std::cout << (stderr, "%s\n", modbus_strerror(errno));
-		}
+		//// write registers (coils)
+		//rc = modbus_write_registers(ctx, raddr, rwords, write_coils);
+		//if (rc == -1)
+		//{
+		//	listenError = true;
+		//	std::cout << "ERROR\n";
+		//	std::cout << (stderr, "%s\n", modbus_strerror(errno));
+		//}
 
-		// read registers
-		rc = modbus_read_registers(ctx, raddr, rwords, coils_tab_reg);
-		if (rc == -1) {
-			listenError = true;
-			std::cout << "ERROR\n";
-			std::cout << (stderr, "%s\n", modbus_strerror(errno));
-		}
+		//// read registers
+		//rc = modbus_read_registers(ctx, raddr, rwords, coils_tab_reg);
+		//if (rc == -1) {
+		//	listenError = true;
+		//	std::cout << "ERROR\n";
+		//	std::cout << (stderr, "%s\n", modbus_strerror(errno));
+		//}
 
-		// read input registers
-		rc = modbus_read_input_registers(ctx, raddr, rwords, registers_tab_reg);
-		if (rc == -1) {
-			listenError = true;
-			std::cout << "ERROR\n";
-			std::cout << (stderr, "%s\n", modbus_strerror(errno));
-		}
+		//// read input registers
+		//rc = modbus_read_input_registers(ctx, raddr, rwords, registers_tab_reg);
+		//if (rc == -1) {
+		//	listenError = true;
+		//	std::cout << "ERROR\n";
+		//	std::cout << (stderr, "%s\n", modbus_strerror(errno));
+		//}
 	}
 	isListening = false;
 }
@@ -192,7 +222,9 @@ ModbusInCHOP::listen()
 void
 ModbusInCHOP::startListening()
 {
-	std::thread listenThread(&ModbusInCHOP::listen, this);
+	//std::thread listenThread (&ModbusInCHOP::listen, this);
+	isListening = true;
+	/*listenThread.join();*/
 }
 
 void
@@ -213,7 +245,7 @@ ModbusInCHOP::copyWriteBuffer(const OP_Inputs* inputs)
 			// for each bit
 			for (int j = 0; j < 16; j++) {
 				// bit shift to correct position
-				tmp_reg += bool(c_data[i * 16 + 15 - j]) << 15 - j;
+				tmp_reg += bool(c_data[i * 16 + 15 - j]) << (15 - j);
 			}
 
 			write_coils[i] = tmp_reg;
@@ -263,19 +295,19 @@ ModbusInCHOP::getOutputInfo(CHOP_OutputInfo* info, const OP_Inputs* inputs, void
 	//{
 	//	return false;
 	//}
-//else
-//{
-/*info->numChannels = inputs->getParInt("Rwords");*/
-info->numChannels = 2;
+	//else
+	//{
+	/*info->numChannels = inputs->getParInt("Rwords");*/
+	info->numChannels = 2;
 
-// Since we are outputting a timeslice, the system will dictate
-// the numSamples and startIndex of the CHOP data
-info->numSamples = inputs->getParInt("Rwords") * 16;
-info->startIndex = inputs->getParInt("Raddr") * 16;
+	// Since we are outputting a timeslice, the system will dictate
+	// the numSamples and startIndex of the CHOP data
+	info->numSamples = inputs->getParInt("Rwords") * 16;
+	info->startIndex = inputs->getParInt("Raddr") * 16;
 
-// For illustration we are going to output 120hz data
-info->sampleRate = 60;
-return true;
+	// For illustration we are going to output 120hz data
+	info->sampleRate = 60;
+	return true;
 //}
 }
 
@@ -303,7 +335,7 @@ ModbusInCHOP::execute(CHOP_Output* output,
 	void* reserved)
 {
 	myExecuteCount++;
-	int active = inputs->getParInt("Active");
+	isActive = bool(inputs->getParInt("Active"));
 
 	//std::cout << myExecuteCount % 3;
 
@@ -311,7 +343,7 @@ ModbusInCHOP::execute(CHOP_Output* output,
 	if (!isConnected)
 	{
 		// if we should connect
-		if (active)
+		if (isActive)
 		{
 			const char *ip = inputs->getParString("Ip");
 			int port = inputs->getParInt("Port");
@@ -324,7 +356,7 @@ ModbusInCHOP::execute(CHOP_Output* output,
 	else
 	{
 		// if we should not be connected, disconnect
-		if (!active)
+		if (!isActive)
 		{
 			disconnect();
 		}
@@ -336,6 +368,7 @@ ModbusInCHOP::execute(CHOP_Output* output,
 
 			copyWriteBuffer(inputs);
 			copyReadBuffers(output);
+			//doCom();
 
 			// if we are not listening, start the thread
 			if (!isListening) {
