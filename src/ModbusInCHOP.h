@@ -13,6 +13,7 @@
 */
 
 #include "CHOP_CPlusPlusBase.h"
+#include <thread>
 
 
 // To get more help about these functions, look at CHOP_CPlusPlusBase.h
@@ -54,9 +55,11 @@ private:
 	void comRead(int raddr, int rwords);
 	void copyWriteBuffer(const OP_Inputs*, int rwords);
 	void copyReadBuffers(CHOP_Output*, int rwords);
+	
+	std::thread*		myThread;
 
 	void listen();
-	void startListening();
+	//void startListening();
 
 	int				raddr;
 	int				rwords;

@@ -207,6 +207,40 @@ ModbusInCHOP::comRead(int raddr, int rwords)
 //	std::thread listenThread (&ModbusInCHOP::listen, this);
 //}
 
+void ModbusInCHOP::listen()
+{
+	myThread = new std::thread(
+		[this]()
+		{
+			isListening = true;
+			listenError = false;
+			while (!listenError && !stopListening)
+			{
+				// write registers (coils)
+				rc = modbus_write_registers(ctx, raddr, rwords, write_coils);
+				if (rc == -1)
+				{
+					listenError = true;
+				}
+		
+				// read registers
+				rc = modbus_read_registers(ctx, raddr, rwords, coils_tab_reg);
+				if (rc == -1) {
+					listenError = true;
+				}
+		
+				// read input registers
+				rc = modbus_read_input_registers(ctx, raddr, rwords, registers_tab_reg);
+				if (rc == -1) {
+					listenError = true;
+				}
+			}
+			isListening = false;
+		}
+	);
+}
+
+
 void
 ModbusInCHOP::copyWriteBuffer(const OP_Inputs* inputs, int rwords)
 {
@@ -336,33 +370,36 @@ ModbusInCHOP::execute(CHOP_Output* output,
 			int raddr = inputs->getParInt("Raddr");
 			int rwords = inputs->getParInt("Rwords");
 
-			if (bool(inputs->getParInt("Staggerreq")))
-			{
-				switch (myExecuteCount % 2)
-				{
-				case 0:
-					copyWriteBuffer(inputs, rwords);
-					comWrite(raddr, rwords);
-					break;
-				case 1:
-					comRead(raddr, rwords);
-					copyReadBuffers(output, rwords);
-					break;
-				}
-			}
-			else
-			{
-				copyWriteBuffer(inputs, rwords);
-				comWrite(raddr, rwords);
-				comRead(raddr, rwords);
-				copyReadBuffers(output, rwords);
-			}
-			
-			//// if we are not listening, start the thread
-			//if (!isListening) {
-			//	// start thread
-			//	startListening();
+			//if (bool(inputs->getParInt("Staggerreq")))
+			//{
+			//	switch (myExecuteCount % 2)
+			//	{
+			//	case 0:
+			//		copyWriteBuffer(inputs, rwords);
+			//		comWrite(raddr, rwords);
+			//		break;
+			//	case 1:
+			//		comRead(raddr, rwords);
+			//		copyReadBuffers(output, rwords);
+			//		break;
+			//	}
 			//}
+			//else
+			//{
+			//	copyWriteBuffer(inputs, rwords);
+			//	comWrite(raddr, rwords);
+			//	comRead(raddr, rwords);
+			//	copyReadBuffers(output, rwords);
+			//}
+
+			copyWriteBuffer(inputs, rwords);
+			copyReadBuffers(output, rwords);
+			
+			// if we are not listening, start the thread
+			if (!isListening) {
+				// start thread
+				listen();
+			}
 		}
 	}
 }
