@@ -12,8 +12,6 @@
 * prior written permission from Derivative.
 */
 
-//#include <inttypes.h>
-//#include <stdio.h>
 #include <modbus.h>
 #include <iostream>
 //#include <thread>
@@ -31,11 +29,6 @@
 #include <cmath>
 #include <assert.h>
 #include <string>
-
-//#define LAST(k,n) ((k) & ((1<<(n))-1))
-//#define MID(k,m,n) LAST((k)>>(m),((n)-(m)))
-
-
 
 // These functions are basic C function, which the DLL loader can find
 // much easier than finding a C++ Class.
@@ -87,14 +80,6 @@ DestroyCHOPInstance(CHOP_CPlusPlusBase* instance)
 	// Delete the instance here, this will be called when
 	// Touch is shutting down, when the CHOP using that instance is deleted, or
 	// if the CHOP loads a different DLL
-	//std::cout << "connected\n";
-	//if (instance)
-	//{
-	//	std::cout << "disconnected\n";
-	//	modbus_close(ctx);
-	//	modbus_free(ctx);
-	//	myConnectionState = 0;
-	//}
 	delete (ModbusInCHOP*)instance;
 }
 
@@ -104,85 +89,88 @@ DestroyCHOPInstance(CHOP_CPlusPlusBase* instance)
 ModbusInCHOP::ModbusInCHOP(const OP_NodeInfo* info) : myNodeInfo(info)
 {
 	myExecuteCount = 0;
-	//isConnected = false;
-	//isListening = false;
-	//myOffset = 0.0;
+	isConnected = false;
+	isListening = false;
 }
 
 ModbusInCHOP::~ModbusInCHOP()
 {
 
 }
-//
-//void
-//ModbusInCHOP::connect(const char *ip, int port)
-//{
-//	std::cout << ip << "\n";
-//	std::cout << port << "\n";
-//	//std::cout << modbus_new_tcp(ip, port);
-//	ctx = modbus_new_tcp(ip, port);
-//	if (ctx == NULL) {
-//		std::cout << fprintf(stderr, "Unable to allocate libmodbus context\n");
-//	}
-//	rc = modbus_connect(ctx);
-//	if (rc == -1) {
-//		std::cout << fprintf(stderr, "Unable to connect %s\n", modbus_strerror(errno));
-//		modbus_free(ctx);
-//	}
-//	else {
-//		std::cout << "connection established\n";
-//		isConnected = true;
-//		stopListening = false;
-//		//start listening here
-//
-//		//startListening();
-//	}
-//}
-//
-//void
-//ModbusInCHOP::disconnect()
-//{
-//	// signal thread to stop listening
-//	if (isListening) {
-//		stopListening = true;
-//	}
-//	else
-//	{
-//		/*std::cout << "disconnected\n";*/
-//		modbus_close(ctx);
-//		modbus_free(ctx);
-//		isConnected = false;
-//	}
-//}
-//
-//void
-//ModbusInCHOP::doCom(int raddr, int rwords)
-//{
-//	// write registers (coils)
-//	rc = modbus_write_registers(ctx, raddr, rwords, write_coils);
-//	if (rc == -1)
-//	{
-//		listenError = true;
-//		std::cout << "ERROR\n";
-//		std::cout << (stderr, "%s\n", modbus_strerror(errno));
-//	}
-//
-//	// read registers
-//	rc = modbus_read_registers(ctx, raddr, rwords, coils_tab_reg);
-//	if (rc == -1) {
-//		listenError = true;
-//		std::cout << "ERROR\n";
-//		std::cout << (stderr, "%s\n", modbus_strerror(errno));
-//	}
-//
-//	// read input registers
-//	rc = modbus_read_input_registers(ctx, raddr, rwords, registers_tab_reg);
-//	if (rc == -1) {
-//		listenError = true;
-//		std::cout << "ERROR\n";
-//		std::cout << (stderr, "%s\n", modbus_strerror(errno));
-//	}
-//}
+
+void
+ModbusInCHOP::connect(const char *ip, int port)
+{
+	std::cout << ip << "\n";
+	std::cout << port << "\n";
+	//std::cout << modbus_new_tcp(ip, port);
+	ctx = modbus_new_tcp(ip, port);
+	if (ctx == NULL) {
+		std::cout << fprintf(stderr, "Unable to allocate libmodbus context\n");
+	}
+	rc = modbus_connect(ctx);
+	if (rc == -1) {
+		std::cout << fprintf(stderr, "Unable to connect %s\n", modbus_strerror(errno));
+		modbus_free(ctx);
+	}
+	else {
+		std::cout << "connection established\n";
+		isConnected = true;
+		stopListening = false;
+		//start listening here
+
+		//startListening();
+	}
+}
+
+void
+ModbusInCHOP::disconnect()
+{
+	// signal thread to stop listening
+	if (isListening) {
+		stopListening = true;
+	}
+	else
+	{
+		/*std::cout << "disconnected\n";*/
+		modbus_close(ctx);
+		modbus_free(ctx);
+		isConnected = false;
+	}
+}
+
+void
+ModbusInCHOP::comWrite(int raddr, int rwords)
+{
+	// write registers (coils)
+	rc = modbus_write_registers(ctx, raddr, rwords, write_coils);
+	if (rc == -1)
+	{
+		listenError = true;
+		std::cout << "ERROR\n";
+		std::cout << (stderr, "%s\n", modbus_strerror(errno));
+	}
+}
+
+void
+ModbusInCHOP::comRead(int raddr, int rwords)
+{
+	// read registers
+	rc = modbus_read_registers(ctx, raddr, rwords, coils_tab_reg);
+	if (rc == -1) {
+		listenError = true;
+		std::cout << "ERROR\n";
+		std::cout << (stderr, "%s\n", modbus_strerror(errno));
+	}
+
+	// read input registers
+	rc = modbus_read_input_registers(ctx, raddr, rwords, registers_tab_reg);
+	if (rc == -1) {
+		listenError = true;
+		std::cout << "ERROR\n";
+		std::cout << (stderr, "%s\n", modbus_strerror(errno));
+	}
+}
 
 //void
 //ModbusInCHOP::listen()
@@ -191,85 +179,77 @@ ModbusInCHOP::~ModbusInCHOP()
 //	listenError = false;
 //	while (!listenError && !stopListening)
 //	{
-//		//// write registers (coils)
-//		//rc = modbus_write_registers(ctx, raddr, rwords, write_coils);
-//		//if (rc == -1)
-//		//{
-//		//	listenError = true;
-//		//	std::cout << "ERROR\n";
-//		//	std::cout << (stderr, "%s\n", modbus_strerror(errno));
-//		//}
+//		// write registers (coils)
+//		rc = modbus_write_registers(ctx, raddr, rwords, write_coils);
+//		if (rc == -1)
+//		{
+//			listenError = true;
+//		}
 //
-//		//// read registers
-//		//rc = modbus_read_registers(ctx, raddr, rwords, coils_tab_reg);
-//		//if (rc == -1) {
-//		//	listenError = true;
-//		//	std::cout << "ERROR\n";
-//		//	std::cout << (stderr, "%s\n", modbus_strerror(errno));
-//		//}
+//		// read registers
+//		rc = modbus_read_registers(ctx, raddr, rwords, coils_tab_reg);
+//		if (rc == -1) {
+//			listenError = true;
+//		}
 //
-//		//// read input registers
-//		//rc = modbus_read_input_registers(ctx, raddr, rwords, registers_tab_reg);
-//		//if (rc == -1) {
-//		//	listenError = true;
-//		//	std::cout << "ERROR\n";
-//		//	std::cout << (stderr, "%s\n", modbus_strerror(errno));
-//		//}
+//		// read input registers
+//		rc = modbus_read_input_registers(ctx, raddr, rwords, registers_tab_reg);
+//		if (rc == -1) {
+//			listenError = true;
+//		}
 //	}
 //	isListening = false;
 //}
-
+//
 //void
 //ModbusInCHOP::startListening()
 //{
-//	//std::thread listenThread (&ModbusInCHOP::listen, this);
-//	isListening = true;
-//	/*listenThread.join();*/
+//	std::thread listenThread (&ModbusInCHOP::listen, this);
 //}
 
-//void
-//ModbusInCHOP::copyWriteBuffer(const OP_Inputs* inputs, int rwords)
-//{
-//	// update write registers buffer
-//	if (inputs->getNumInputs() > 0)
-//	{
-//		const OP_CHOPInput *cinput = inputs->getInputCHOP(0);
-//
-//		const float *c_data = cinput->getChannelData(0);
-//		uint16_t tmp_reg;
-//
-//		// for each word
-//		for (int i = 0; i < rwords; i++) {
-//			tmp_reg = 0;
-//
-//			// for each bit
-//			for (int j = 0; j < 16; j++) {
-//				// bit shift to correct position
-//				tmp_reg += bool(c_data[i * 16 + 15 - j]) << (15 - j);
-//			}
-//
-//			write_coils[i] = tmp_reg;
-//		}
-//	}
-//}
-//
-//void
-//ModbusInCHOP::copyReadBuffers(CHOP_Output* output, int rwords)
-//{
-//	// for each word
-//	for (int i = 0; i < rwords; i++)
-//	{
-//		// for each bit
-//		for (int j = 0; j < 16; j++)
-//		{
-//			// update registers chan sample
-//			output->channels[0][i * 16 + j] = float((bool)(coils_tab_reg[i] & (1U << j)));
-//
-//			// update input registers chan sample
-//			output->channels[1][i * 16 + j] = float((bool)(registers_tab_reg[i] & (1U << j)));
-//		}
-//	}
-//}
+void
+ModbusInCHOP::copyWriteBuffer(const OP_Inputs* inputs, int rwords)
+{
+	// update write registers buffer
+	if (inputs->getNumInputs() > 0)
+	{
+		const OP_CHOPInput *cinput = inputs->getInputCHOP(0);
+
+		const float *c_data = cinput->getChannelData(0);
+		uint16_t tmp_reg;
+
+		// for each word
+		for (int i = 0; i < rwords; i++) {
+			tmp_reg = 0;
+
+			// for each bit
+			for (int j = 0; j < 16; j++) {
+				// bit shift to correct position
+				tmp_reg += bool(c_data[i * 16 + 15 - j]) << (15 - j);
+			}
+
+			write_coils[i] = tmp_reg;
+		}
+	}
+}
+
+void
+ModbusInCHOP::copyReadBuffers(CHOP_Output* output, int rwords)
+{
+	// for each word
+	for (int i = 0; i < rwords; i++)
+	{
+		// for each bit
+		for (int j = 0; j < 16; j++)
+		{
+			// update registers chan sample
+			output->channels[0][i * 16 + j] = float((bool)(coils_tab_reg[i] & (1U << j)));
+
+			// update input registers chan sample
+			output->channels[1][i * 16 + j] = float((bool)(registers_tab_reg[i] & (1U << j)));
+		}
+	}
+}
 
 void
 ModbusInCHOP::getGeneralInfo(CHOP_GeneralInfo* ginfo, const OP_Inputs* inputs, void* reserved1)
@@ -289,15 +269,6 @@ ModbusInCHOP::getGeneralInfo(CHOP_GeneralInfo* ginfo, const OP_Inputs* inputs, v
 bool
 ModbusInCHOP::getOutputInfo(CHOP_OutputInfo* info, const OP_Inputs* inputs, void* reserved1)
 {
-	//// If there is an input connected, we are going to match it's channel names etc
-	//// otherwise we'll specify our own.
-	//if (inputs->getNumInputs() > 0)
-	//{
-	//	return false;
-	//}
-	//else
-	//{
-	/*info->numChannels = inputs->getParInt("Rwords");*/
 	info->numChannels = 2;
 
 	// Since we are outputting a timeslice, the system will dictate
@@ -334,70 +305,66 @@ ModbusInCHOP::execute(CHOP_Output* output,
 	const OP_Inputs* inputs,
 	void* reserved)
 {
-	//myExecuteCount++;
-	//isActive = bool(inputs->getParInt("Active"));
+	myExecuteCount++;
+	isActive = bool(inputs->getParInt("Active"));
 
-	////std::cout << myExecuteCount % 3;
+	//std::cout << myExecuteCount % 3;
 
-	//// if we are not connected
-	//if (!isConnected)
-	//{
-	//	// if we should connect
-	//	if (isActive)
-	//	{
-	//		const char *ip = inputs->getParString("Ip");
-	//		int port = inputs->getParInt("Port");
-	//		//raddr = inputs->getParInt("Raddr");
-	//		//rwords = inputs->getParInt("Rwords");
-	//		connect(ip, port);
+	// if we are not connected
+	if (!isConnected)
+	{
+		// if we should connect
+		if (isActive)
+		{
+			const char *ip = inputs->getParString("Ip");
+			int port = inputs->getParInt("Port");
+			connect(ip, port);
 
-	//		//std::cout << ip << "\n";
-	//		//std::cout << port << "\n";
-	//		////std::cout << modbus_new_tcp(ip, port);
-	//		//ctx = modbus_new_tcp(ip, port);
-	//		//if (ctx == NULL) {
-	//		//	std::cout << fprintf(stderr, "Unable to allocate libmodbus context\n");
-	//		//}
-	//		//rc = modbus_connect(ctx);
-	//		//if (rc == -1) {
-	//		//	std::cout << fprintf(stderr, "Unable to connect %s\n", modbus_strerror(errno));
-	//		//	modbus_free(ctx);
-	//		//}
-	//		//else {
-	//		//	std::cout << "connection established\n";
-	//		//	isConnected = true;
-	//		//	stopListening = false;
-	//		//	//start listening here
+		}
+	}
+	// if we are connected
+	else
+	{
+		// if we should not be connected, disconnect
+		if (!isActive)
+		{
+			disconnect();
+		}
+		// if we are connected and should be
+		else
+		{
+			int raddr = inputs->getParInt("Raddr");
+			int rwords = inputs->getParInt("Rwords");
 
-	//		//	//startListening();
-	//		//}
-	//	}
-	//}
-	//// if we are connected
-	//else
-	//{
-	//	// if we should not be connected, disconnect
-	//	if (!isActive)
-	//	{
-	//		disconnect();
-	//	}
-	//	// if we are connected and should be
-	//	else
-	//	{
-	//		int raddr = inputs->getParInt("Raddr");
-	//		int rwords = inputs->getParInt("Rwords");
-
-	//		copyWriteBuffer(inputs, rwords);
-	//		copyReadBuffers(output, rwords);
-	//		doCom(raddr, rwords);
-
-	//		//// if we are not listening, start the thread
-	//		//if (!isListening) {
-	//		//	// start thread
-	//		//	startListening();
-	//		//}
-	//	}
-	//}
+			if (bool(inputs->getParInt("Staggerreq")))
+			{
+				switch (myExecuteCount % 2)
+				{
+				case 0:
+					copyWriteBuffer(inputs, rwords);
+					comWrite(raddr, rwords);
+					break;
+				case 1:
+					comRead(raddr, rwords);
+					copyReadBuffers(output, rwords);
+					break;
+				}
+			}
+			else
+			{
+				copyWriteBuffer(inputs, rwords);
+				comWrite(raddr, rwords);
+				comRead(raddr, rwords);
+				copyReadBuffers(output, rwords);
+			}
+			
+			//// if we are not listening, start the thread
+			//if (!isListening) {
+			//	// start thread
+			//	startListening();
+			//}
+		}
+	}
 }
 
 int32_t
@@ -421,18 +388,12 @@ ModbusInCHOP::getInfoCHOPChan(int32_t index,
 		chan->name->setString("executeCount");
 		chan->value = (float)myExecuteCount;
 	}
-
-	//if (index == 1)
-	//{
-	//	chan->name->setString("offset");
-	//	chan->value = (float)myOffset;
-	//}
 }
 
 bool		
 ModbusInCHOP::getInfoDATSize(OP_InfoDATSize* infoSize, void* reserved1)
 {
-	infoSize->rows = 2;
+	infoSize->rows = 1;
 	infoSize->cols = 2;
 	// Setting this to false means we'll be assigning values to the table
 	// one row at a time. True means we'll do it one column at a time.
@@ -454,27 +415,13 @@ ModbusInCHOP::getInfoDATEntries(int32_t index,
 		entries->values[0]->setString("executeCount");
 
 		// Set the value for the second column
-//#ifdef _WIN32
-//		sprintf_s(tempBuffer, "%d", myExecuteCount);
-//#else // macOS
-        //snprintf(tempBuffer, sizeof(tempBuffer), "%d", myExecuteCount);
-//#endif
+		#ifdef _WIN32
+				sprintf_s(tempBuffer, "%d", myExecuteCount);
+		#else // macOS
+				snprintf(tempBuffer, sizeof(tempBuffer), "%d", myExecuteCount);
+		#endif
 		entries->values[1]->setString(tempBuffer);
 	}
-
-//	if (index == 1)
-//	{
-//		// Set the value for the first column
-//		entries->values[0]->setString("offset");
-//
-//		// Set the value for the second column
-//#ifdef _WIN32
-//        sprintf_s(tempBuffer, "%g", myOffset);
-//#else // macOS
-//        snprintf(tempBuffer, sizeof(tempBuffer), "%g", myOffset);
-//#endif
-//		entries->values[1]->setString( tempBuffer);
-//	}
 }
 
 void
@@ -520,7 +467,7 @@ ModbusInCHOP::setupParameters(OP_ParameterManager* manager, void *reserved1)
 		assert(res == OP_ParAppendResult::Success);
 	}
 
-	// connect
+	// stagger req
 	{
 		OP_NumericParameter  np;
 
@@ -534,32 +481,7 @@ ModbusInCHOP::setupParameters(OP_ParameterManager* manager, void *reserved1)
 		assert(res == OP_ParAppendResult::Success);
 	}
 
-
-	//// register filter
-	//{
-	//	OP_StringParameter	sp;
-
-	//	sp.name = "Rfilter";
-	//	sp.label = "Register Filter";
-	//	sp.defaultValue = "[1-10] 12 14";
-
-	//	OP_ParAppendResult res = manager->appendString(sp);
-	//	assert(res == OP_ParAppendResult::Success);
-	//}
-
-	//// coil filter
-	//{
-	//	OP_StringParameter	sp;
-
-	//	sp.name = "Coils";
-	//	sp.label = "Coils";
-	//	sp.defaultValue = "127.0.0.1";
-
-	//	OP_ParAppendResult res = manager->appendString(sp);
-	//	assert(res == OP_ParAppendResult::Success);
-	//}
-
-	// Registers Address
+	// Register Address
 	{
 		OP_NumericParameter  np;
 
@@ -577,7 +499,7 @@ ModbusInCHOP::setupParameters(OP_ParameterManager* manager, void *reserved1)
 		assert(res == OP_ParAppendResult::Success);
 	}
 	
-	// Registers Num Bits
+	// Register Words
 	{
 		OP_NumericParameter  np;
 
@@ -599,8 +521,5 @@ ModbusInCHOP::setupParameters(OP_ParameterManager* manager, void *reserved1)
 void 
 ModbusInCHOP::pulsePressed(const char* name, void* reserved1)
 {
-	//if (!strcmp(name, "Reset"))
-	//{
-	//	myOffset = 0.0;
-	//}
+
 }

@@ -15,22 +15,6 @@
 #include "CHOP_CPlusPlusBase.h"
 
 
-/*
-
-This example file implements a class that does 2 different things depending on
-if a CHOP is connected to the CPlusPlus CHOPs input or not.
-The example is timesliced, which is the more complex way of working.
-
-If an input is connected the node will output the same number of channels as the
-input and divide the first 'N' samples in the input channel by 2. 'N' being the current
-timeslice size. This is noteworthy because if the input isn't changing then the output
-will look wierd since depending on the timeslice size some number of the first samples
-of the input will get used.
-
-If no input is connected then the node will output a smooth sine wave at 120hz.
-*/
-
-
 // To get more help about these functions, look at CHOP_CPlusPlusBase.h
 class ModbusInCHOP : public CHOP_CPlusPlusBase
 {
@@ -64,27 +48,27 @@ public:
 
 
 private:
-	//void connect(const char *ip, int port);
-	//void disconnect();
-	//void listen();
-	//void startListening();
+	void connect(const char *ip, int port);
+	void disconnect();
+	void comWrite(int raddr, int rwords);
+	void comRead(int raddr, int rwords);
+	void copyWriteBuffer(const OP_Inputs*, int rwords);
+	void copyReadBuffers(CHOP_Output*, int rwords);
 
-	//void doCom(int raddr, int rwords);
+	void listen();
+	void startListening();
 
-	//void copyWriteBuffer(const OP_Inputs*, int rwords);
-	//void copyReadBuffers(CHOP_Output*, int rwords);
+	int				raddr;
+	int				rwords;
 
-	//int				raddr;
-	//int				rwords;
+	modbus_t*			ctx;
 
-	//modbus_t*			ctx;
+	bool				isActive;
+	bool				isConnected;
 
-	//bool				isActive;
-	//bool				isConnected;
-
-	//bool				isListening;
-	//bool				listenError;
-	//bool				stopListening;
+	bool				isListening;
+	bool				listenError;
+	bool				stopListening;
 
 	//std::thread			listenThread;
 
