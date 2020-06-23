@@ -61,18 +61,31 @@ public:
 	virtual void		setupParameters(OP_ParameterManager* manager, void *reserved1) override;
 	virtual void		pulsePressed(const char* name, void* reserved1) override;
 
-	int				raddr;
-	int				rwords;
 
-	modbus_t*			ctx;
 
-	bool				isActive;
-	bool				isConnected;
+private:
+	//void connect(const char *ip, int port);
+	//void disconnect();
+	//void listen();
+	//void startListening();
 
-	bool				isListening;
-	bool				listenError;
-	bool				stopListening;
-	
+	//void doCom(int raddr, int rwords);
+
+	//void copyWriteBuffer(const OP_Inputs*, int rwords);
+	//void copyReadBuffers(CHOP_Output*, int rwords);
+
+	//int				raddr;
+	//int				rwords;
+
+	//modbus_t*			ctx;
+
+	//bool				isActive;
+	//bool				isConnected;
+
+	//bool				isListening;
+	//bool				listenError;
+	//bool				stopListening;
+
 	//std::thread			listenThread;
 
 	uint16_t			write_coils[100 * sizeof(uint16_t)];
@@ -80,19 +93,6 @@ public:
 
 	uint16_t			coils_tab_reg[100 * sizeof(uint16_t)];
 	uint16_t			registers_tab_reg[100 * sizeof(uint16_t)];
-
-private:
-	void connect(const char* ip, uint8_t port);
-	void disconnect();
-	void listen();
-	void startListening();
-
-	void doCom();
-
-	void copyWriteBuffer(const OP_Inputs*);
-	void copyReadBuffers(CHOP_Output*);
-
-
 
 	// We don't need to store this pointer, but we do for the example.
 	// The OP_NodeInfo class store information about the node that's using
